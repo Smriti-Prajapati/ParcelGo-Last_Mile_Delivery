@@ -153,8 +153,16 @@ public class OrderService {
         orderRepository.save(order);
 
         logTrackingEvent(order, newStatus, actorId, request.getNotes());
-        notificationService.sendStatusUpdateEmail(order, previousStatus);
-        notificationService.sendStatusUpdateSms(order);
+
+        // Extract all needed data before async calls (lazy loading safe)
+        String toEmail = order.getCustomer().getEmail();
+        String customerName = order.getCustomer().getName();
+        String customerPhone = order.getCustomer().getPhone();
+        String agentName = order.getAgent() != null ? order.getAgent().getUser().getName() : null;
+
+        notificationService.sendStatusUpdateEmail(toEmail, customerName, order.getTrackingId(),
+            newStatus.name(), order.getPickupAddress(), order.getDropAddress(), agentName);
+        notificationService.sendStatusUpdateSms(customerPhone, order.getTrackingId(), newStatus.name());
 
         return OrderResponse.from(order);
     }
@@ -232,7 +240,17 @@ public class OrderService {
             // No agents available right now — order stays without agent, will be assigned later
         }
 
-        notificationService.sendRescheduleConfirmation(order);
+        notificationService.sendRescheduleEmail(
+            order.getCustomer().getEmail(),
+            order.getCustomer().getName(),
+            order.getTrackingId(),
+            request.getNewDate().toString()
+        );
+        notificationService.sendRescheduleSms(
+            order.getCustomer().getPhone(),
+            order.getTrackingId(),
+            request.getNewDate().toString()
+        );
         return OrderResponse.from(order);
     }
 
