@@ -23,6 +23,9 @@ public class NotificationService {
     @Value("${resend.api-key:}")
     private String resendApiKey;
 
+    @Value("${resend.verified-email:}")
+    private String resendVerifiedEmail;
+
     @Value("${twilio.account-sid:}")
     private String twilioAccountSid;
 
@@ -108,9 +111,15 @@ public class NotificationService {
 
     private void sendEmailViaResend(String toEmail, String subject, String textBody, String trackingId) {
         try {
+            // Resend free tier only allows sending to verified email (smritiprajapati15@gmail.com)
+            // With a verified domain, change 'from' to use that domain and remove this override
+            String recipient = (resendVerifiedEmail != null && !resendVerifiedEmail.isBlank())
+                ? resendVerifiedEmail  // always deliver to verified email on free tier
+                : toEmail;
+
             String json = "{"
                 + "\"from\":\"ParcelGo <onboarding@resend.dev>\","
-                + "\"to\":[\"" + toEmail + "\"],"
+                + "\"to\":[\"" + recipient + "\"],"
                 + "\"subject\":\"" + subject + "\","
                 + "\"text\":\"" + textBody.replace("\n", "\\n").replace("\"", "\\\"") + "\""
                 + "}";
@@ -126,7 +135,7 @@ public class NotificationService {
                 .send(request, HttpResponse.BodyHandlers.ofString());
 
             if (response.statusCode() == 200 || response.statusCode() == 201) {
-                log.info("Email sent to {} for order {}", toEmail, trackingId);
+                log.info("Email sent to {} for order {}", recipient, trackingId);
             } else {
                 log.error("Email failed for order {}: {}", trackingId, response.body());
             }
