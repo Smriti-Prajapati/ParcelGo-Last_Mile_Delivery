@@ -6,8 +6,6 @@ The application uses a **React frontend**, **Spring Boot backend**, and **Postgr
 
 ## 1. System Architecture
 
-![ParcelGo System Architecture](./docs/parcelgo-system-architecture.jpeg)
-
 The basic flow is:
 
 **Customer / Admin / Delivery Agent → React → REST API → Spring Boot → PostgreSQL**
