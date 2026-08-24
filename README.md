@@ -4,7 +4,8 @@ ParcelGo is a last-mile delivery management platform that handles the main steps
 
 ## Live Demo
 
-[ParcelGo Live App](https://parcel-go-last-mile-delivery-rouge.vercel.app/)
+- **Frontend:** [ParcelGo Live App](https://parcel-go-last-mile-delivery-nv6fxuzrp.vercel.app/)
+- **Backend API:** [ParcelGo Backend](https://parcelgo-backend-8z59.onrender.com)
 
 ## Features
 
