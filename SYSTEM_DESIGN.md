@@ -1,96 +1,140 @@
 # ParcelGo — System Design
 
-ParcelGo is designed around four main parts of the delivery process: pricing, zone detection, agent assignment, and order tracking. The system uses a Spring Boot backend with PostgreSQL, while the frontend communicates with the backend through REST APIs.
+ParcelGo is a last-mile delivery management system designed to handle shipping charge calculation, zone identification, agent assignment, order tracking, and customer notifications.
+
+The application uses a **React frontend**, **Spring Boot backend**, and **PostgreSQL database**. The frontend communicates with the backend through REST APIs, with separate access for customers, delivery agents, and admins.
+
+## 1. System Architecture
 
 ![ParcelGo System Architecture](./docs/parcelgo-system-architecture.jpeg)
 
-## Rate Calculation Engine
+The basic flow is:
 
-The rate calculation is database-driven, so pricing can be changed by an admin without modifying the application code.
+**Customer / Admin / Delivery Agent → React → REST API → Spring Boot → PostgreSQL**
 
-The calculation works as follows:
+The backend separates responsibilities such as order management, pricing, zone detection, agent assignment, and notifications. This keeps the business logic easier to maintain and test.
 
-1. The customer enters the pickup and drop pincodes, package dimensions, actual weight, order type (B2B/B2C), and payment type.
-2. The system looks up both pincodes in `zone_areas` to find their respective zones. If a pincode is not configured, the order cannot proceed.
-3. Volumetric weight is calculated using:
+![ParcelGo System Architecture](./docs/parcelgo-system-architecture.jpeg)
+
+Flyway manages database migrations, Spring Mail handles emails, and Fast2SMS handles SMS notifications.
+
+## 2. Rate Calculation Engine
+
+Pricing is stored in the database instead of being hardcoded, allowing admins to update rates without changing the application code.
+
+The customer provides pickup and drop pincodes, package dimensions, actual weight, order type (**B2B/B2C**), and payment type (**Prepaid/COD**).
+
+First, the system finds both zones using the `zone_areas` table. If a pincode is not configured, the calculation stops with an error.
+
+Volumetric weight is calculated as:
 
 **Volumetric Weight = (L × B × H) / 5000**
 
-4. The higher of actual and volumetric weight becomes the billable weight.
+The billable weight is:
 
 ```text
 Billable Weight = max(Actual Weight, Volumetric Weight)
-
 ```
 
-5. The system determines whether the shipment is **INTRA** or **INTER** zone.
-6. It then finds the matching rate card using the order type, zone type, and weight range.
-7. The base delivery charge is calculated from the configured base charge and per-kg rate.
-8. For COD orders, the applicable COD surcharge is added.
-9. The complete calculation is returned before the customer confirms the order.
+The system then determines whether the shipment is **INTRA** or **INTER** based on the pickup and drop zones.
 
-This keeps pricing flexible because admins can update rate cards directly from the application.
+The rate card is selected using:
 
-## Zone Detection
+* B2B or B2C
+* INTRA or INTER
+* Billable weight range
 
-ParcelGo uses pincode-based zone detection. Each zone can contain multiple pincodes stored in the `zone_areas` table.
+The base charge and per-kg rate are applied, and a COD surcharge is added when required. The final amount and calculation details are returned before order confirmation so the customer can understand the charge.
 
-When an order is created, the pickup and drop pincodes are looked up to determine their zones. The two zones are then used to decide whether the shipment is intra-zone or inter-zone.
+## 3. Zone Detection
 
-This approach is simple, fast, and easy to maintain for the current scope. New pincodes can be added by the admin without changing the code.
-
-## Auto-Assignment
-
-When an order needs a delivery agent, the assignment service first looks for agents who are currently available and belong to the order's delivery zone.
-
-If no suitable agent is available in that zone, the system falls back to other available agents.
-
-When location data is available, the system can use the agent's current location to select the nearest suitable agent. The selected agent is then assigned to the order and marked as `BUSY`.
-
-The assignment logic is kept separate from the order service so it can be extended later with features such as load balancing, ETA, or more advanced location-based matching.
-
-## Order Status & Tracking
-
-ParcelGo follows a controlled order lifecycle:
+ParcelGo uses pincodes to determine delivery zones. Multiple pincodes can belong to one zone and are stored in `zone_areas`.
 
 ```text
-CONFIRMED
-    ↓
-PICKED_UP
-    ↓
-IN_TRANSIT
-    ↓
-OUT_FOR_DELIVERY
-    ↓
-DELIVERED
+Pickup Pincode → Pickup Zone
+Drop Pincode   → Drop Zone
 
+Same Zone      → INTRA
+Different Zone → INTER
 ```
 
-If delivery fails:
+This approach is simple and suitable for the current requirements. Admins can update pincode mappings without changing the code. Missing pincodes return an error instead of using an incorrect default zone.
+
+## 4. Auto-Assignment
+
+ParcelGo supports manual and automatic agent assignment.
+
+For automatic assignment, the system first looks for agents who are `AVAILABLE` and belong to the order's delivery zone. If none are available, it checks other available agents. When location information is available, the nearest suitable agent can be selected.
+
+After assignment:
 
 ```text
-OUT_FOR_DELIVERY
-    ↓
-FAILED
-    ↓
-RESCHEDULE
-    ↓
-CONFIRMED
-
+Order → Assigned to Agent
+Agent → AVAILABLE → BUSY
 ```
 
-Status changes are validated before being saved, preventing invalid transitions such as directly moving an order from `CONFIRMED` to `DELIVERED`.
+The assignment logic is separate from order management so it can later consider factors such as distance, workload, or estimated delivery time.
 
-Every status change is stored in the `order_tracking` table with the status, actor, notes, and timestamp. The current status is also stored in the `orders` table for quick access, while `order_tracking` keeps the complete history.
+## 5. Order Status and Tracking
 
-Tracking records are not overwritten, so the full delivery journey remains available.
+Orders follow a controlled lifecycle:
 
-## Failed Delivery Handling
+```text
+CONFIRMED → PICKED_UP → IN_TRANSIT → OUT_FOR_DELIVERY → DELIVERED
+```
 
-When an agent marks an order as `FAILED`, the customer is notified by email and can choose a new delivery date.
+For a failed delivery:
 
-The reschedule is stored with the original date, new date, and optional reason. The previous agent is released and the order is moved back to `CONFIRMED`.
+```text
+OUT_FOR_DELIVERY → FAILED → RESCHEDULE → CONFIRMED
+```
 
-The system then tries to assign an available agent again. If none is available, the order remains unassigned so an admin can assign one later.
+The backend validates every status transition to prevent invalid changes.
 
-The failed attempt is never removed from the tracking history, keeping the entire delivery process auditable. 
+The current status is stored in the `orders` table for quick access. Every status change is also recorded in `order_tracking` with the status, actor, notes, and timestamp. This provides both the current status and the complete history of the order.
+
+## 6. Failed Delivery Handling
+
+When an agent marks an order as `FAILED`, the customer is notified and can select a new delivery date.
+
+The reschedule record stores the original date, new date, and optional reason. The previous agent becomes `AVAILABLE`, and the order returns to `CONFIRMED`. The system then attempts to assign another available agent.
+
+If no agent is available, the order remains unassigned and an admin can assign one later. The failed attempt remains in `order_tracking`, preserving the complete delivery history.
+
+## 7. Notifications
+
+Customers receive notifications when important order events occur.
+
+Email notifications use **Spring Mail**. SMS notifications use **Fast2SMS**, configured through the environment variable:
+
+```text
+FAST2SMS_API_KEY
+```
+
+Notifications are kept separate from the main order logic. If an email or SMS fails, the order status and tracking history are still saved correctly.
+
+## 8. Database Design
+
+PostgreSQL stores the main delivery data, including:
+
+* Users and customers
+* Delivery agents
+* Orders
+* Zones and zone areas
+* Rate cards
+* COD surcharges
+* Assignments
+* Order tracking
+* Reschedules
+
+The `orders` table stores the current state, while `order_tracking` preserves the complete history. Rate cards and zone mappings are database-driven, allowing configuration changes without modifying application code.
+
+Flyway manages schema changes through version-controlled migrations, making database updates consistent across environments.
+
+## 9. Design Approach
+
+The main design goal was to keep ParcelGo simple while separating responsibilities that may change independently.
+
+Pricing, zone detection, agent assignment, tracking, and notifications are handled as separate concerns. This makes the system easier to maintain and leaves room for future improvements.
+
+Overall, the design focuses on **configurable pricing, reliable order processing, clear tracking, practical agent assignment, and maintainable business logic** without adding unnecessary complexity.
