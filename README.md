@@ -1,22 +1,27 @@
 # ParcelGo — Last-Mile Delivery Tracker
 
-ParcelGo is a delivery management platform built to handle the complete last-mile delivery process — from placing an order and calculating its delivery charge to assigning an agent and tracking the delivery.
+ParcelGo is a last-mile delivery management platform that handles the main steps of a delivery workflow — creating orders, calculating delivery charges, assigning agents, tracking orders, and notifying customers.
 
 ## Live Demo
 
-[ParcelGo Live App](https://parcel-go-last-mile-delivery-rouge.vercel.app)
+[ParcelGo Live App](https://parcel-go-last-mile-delivery-rouge.vercel.app/)
 
 ## Features
 
-* Customers can register, place orders, and track deliveries.
-* Delivery charges are calculated automatically before an order is confirmed.
-* Supports B2B/B2C and prepaid/COD orders.
-* Pickup and drop locations are mapped to configured zones.
-* Admins can assign agents manually or use automatic assignment.
-* Customers can view the complete tracking history of an order.
-* Failed deliveries can be rescheduled for another attempt.
-* Admins can manage zones, rates, orders, customers, and delivery agents.
-* Customers receive email and SMS notifications when the delivery status changes.
+* Customer registration, login, order placement, and tracking
+* Admin order creation and management
+* Delivery charge calculation before order confirmation
+* B2B/B2C and Prepaid/COD order support
+* Pincode-based pickup and drop-zone detection
+* Admin management of zones, pincodes, rates, orders, and agents
+* Separate INTRA-zone and INTER-zone pricing
+* Configurable COD surcharge
+* Manual and automatic agent assignment
+* Agent availability tracking
+* Complete order status and tracking history
+* Failed-delivery rescheduling and agent reassignment
+* Email and SMS delivery notifications
+* Admin order filtering and status management
 
 ## Tech Stack
 
@@ -32,8 +37,6 @@ ParcelGo is a delivery management platform built to handle the complete last-mil
 
 ### Requirements
 
-Make sure you have:
-
 * Java 17+
 * Maven 3.8+
 * Node.js 18+
@@ -42,51 +45,62 @@ Make sure you have:
 ### 1. Clone the Repository
 
 ```bash
-git clone https://github.com/your-username/parcelgo.git
-cd parcelgo
+git clone https://github.com/Smriti-Prajapati/ParcelGo-Last_Mile_Delivery.git
+cd ParcelGo-Last_Mile_Delivery
 ```
 
 ### 2. Create the Database
+
+Create a PostgreSQL database:
 
 ```sql
 CREATE DATABASE parcelgo;
 ```
 
-Flyway will create and update the required tables when the backend starts.
+Flyway automatically creates the required tables when the backend starts.
 
 ### 3. Configure Environment Variables
 
-Create a `.env` file based on `.env.example`.
+Create a `.env` file using `.env.example` as a reference.
 
 ```env
-DATABASE_URL=your_database_url
-DATABASE_USERNAME=your_database_username
-DATABASE_PASSWORD=your_database_password
+DB_URL=your_database_url
+DB_USERNAME=your_database_username
+DB_PASSWORD=your_database_password
 
 JWT_SECRET=your_jwt_secret
+JWT_EXPIRATION=86400000
 
-MAIL_USERNAME=your_email
-MAIL_PASSWORD=your_email_password
+MAIL_HOST=smtp.gmail.com
+MAIL_PORT=587
+MAIL_USERNAME=your_email@gmail.com
+MAIL_PASSWORD=your_app_password
 
 FAST2SMS_API_KEY=your_fast2sms_api_key
 ```
 
-Use your actual credentials in the local `.env` file.
+Use your actual credentials only in your local environment.
 
-**Do not commit `.env` or any real credentials to GitHub.**
+**Never commit `.env` or real credentials to GitHub.**
 
-### 4. Start the Backend
+The repository includes `.env.example` with placeholder values.
+
+### 4. Run the Backend
 
 ```bash
 cd backend
 mvn spring-boot:run
 ```
 
-The backend will start at:
+Backend:
 
-`http://localhost:8080`
+```text
+http://localhost:8080
+```
 
-### 5. Start the Frontend
+### 5. Run the Frontend
+
+Open another terminal:
 
 ```bash
 cd frontend
@@ -94,9 +108,11 @@ npm install
 npm run dev
 ```
 
-The frontend will start at:
+Frontend:
 
-`http://localhost:5173`
+```text
+http://localhost:5173
+```
 
 ## API Documentation
 
@@ -133,8 +149,9 @@ DELETE /api/zones/{id}
 GET  /api/rates
 POST /api/rates
 PUT  /api/rates/{id}
-GET  /api/rates/cod
-PUT  /api/rates/cod/{id}
+
+GET /api/rates/cod
+PUT /api/rates/cod/{id}
 ```
 
 ### Agents
@@ -146,81 +163,132 @@ PUT   /api/agents/{id}
 PATCH /api/agents/{id}/availability
 ```
 
+### Admin
+
+```text
+GET /api/admin/dashboard
+GET /api/admin/customers
+```
+
 ## Database Schema
 
-ParcelGo uses PostgreSQL, with Flyway handling database migrations.
+ParcelGo uses PostgreSQL with Flyway migrations.
 
-The database covers the main parts of the application:
+The main entities are:
 
 * Users and roles
 * Customers
 * Delivery agents
 * Orders
-* Zones
+* Zones and zone areas
 * Rate cards
 * COD charges
+* Assignments
 * Tracking history
-* Delivery assignments
+* Reschedules
 
-Migration files can be found in:
+Migration files are located at:
 
 ```text
 backend/src/main/resources/db/migration/
 ```
 
+The `orders` table stores the current order status, while `order_tracking` stores every status change along with its timestamp and actor.
+
+Tracking history is preserved rather than overwritten, so the complete delivery journey remains available for reference.
+
 ## Rate Calculation
 
-The delivery charge is worked out when the customer enters the package details and is shown before the order is confirmed.
+The delivery charge is calculated before the customer confirms the order.
 
-### 1. Find the Zones
+### 1. Zone Detection
 
-The pickup and drop pincodes are matched with the zones configured by the admin.
+Pickup and drop pincodes are matched with the zones configured by the admin.
 
-### 2. Calculate Volumetric Weight
+Shipments within the same zone are treated as **INTRA**, while shipments between different zones are treated as **INTER**.
+
+### 2. Volumetric Weight
 
 ```text
 Volumetric Weight = (L × B × H) / 5000
 ```
 
-### 3. Find the Billable Weight
-
-The system uses whichever is higher:
+### 3. Billable Weight
 
 ```text
 Billable Weight = max(Actual Weight, Volumetric Weight)
 ```
 
-### 4. Select the Rate
+### 4. Rate Selection
 
-The rate card is selected based on:
+The applicable rate is selected based on:
 
 * B2B or B2C
-* Intra-zone or Inter-zone
-* Weight range
+* INTRA or INTER
+* Billable weight range
 
-### 5. Add COD Charge
+### 5. COD Charges
 
-For COD orders, the configured COD surcharge is added to the delivery charge.
+For COD orders, the configured surcharge is added:
 
 ```text
 Final Charge = Base Delivery Charge + COD Surcharge
 ```
 
-Rates are stored in the database, so admins can update them without changing the application code.
+Rates are stored in the database, allowing admins to update pricing without changing the application code.
+
+## Order Tracking
+
+Orders follow a controlled lifecycle:
+
+```text
+CONFIRMED
+    ↓
+PICKED_UP
+    ↓
+IN_TRANSIT
+    ↓
+OUT_FOR_DELIVERY
+    ↓
+DELIVERED
+```
+
+If delivery fails, the order can be rescheduled:
+
+```text
+OUT_FOR_DELIVERY
+    ↓
+FAILED
+    ↓
+RESCHEDULE
+    ↓
+CONFIRMED
+```
+
+The backend validates status transitions before updating an order. Each change is also recorded in the tracking history.
+
+## Agent Assignment
+
+Agents can be assigned manually by an admin or automatically by the system.
+
+For automatic assignment, the system first checks available agents in the delivery zone. When location information is available, it can be used to select a suitable nearby agent.
+
+Agent availability is updated when an order is assigned or released:
+
+```text
+AVAILABLE → BUSY
+BUSY → AVAILABLE
+```
+
+This prevents the same agent from being assigned to multiple orders unnecessarily.
 
 ## Notifications
 
-### Email
+Email notifications are sent through **Spring Mail** when important order-status changes occur.
 
-Email notifications are handled through Spring Mail. Customers receive an email when their order status changes.
+SMS notifications are integrated through **Fast2SMS** and require a configured `FAST2SMS_API_KEY` and sufficient Fast2SMS balance.
 
-### SMS
-
-SMS notifications are integrated using the Fast2SMS API.
-
-The integration is already implemented. To enable SMS sending, configure `FAST2SMS_API_KEY` and maintain sufficient balance in the Fast2SMS account.
-
-Email notifications work independently of SMS.
+Notification failures do not overwrite the order status or tracking history.
 
 ## Testing
 
@@ -231,11 +299,46 @@ cd backend
 mvn test
 ```
 
-The tests cover the main delivery and pricing logic, including:
+The tests cover key areas such as:
 
 * Rate calculation
 * Volumetric weight
+* Billable weight
 * B2B/B2C pricing
-* Intra/inter-zone pricing
+* INTRA/INTER pricing
 * COD charges
 * Agent assignment
+* Order workflow
+
+## Project Structure
+
+```text
+ParcelGo-Last_Mile_Delivery/
+├── backend/
+│   └── src/
+│       └── main/
+│           ├── java/
+│           └── resources/
+│               └── db/
+│                   └── migration/
+├── frontend/
+│   ├── src/
+│   └── public/
+├── .env.example
+└── README.md
+```
+
+## Notes
+
+* Configure all database and external-service credentials through environment variables.
+* Do not commit `.env` or API keys to the repository.
+* Make sure PostgreSQL is running before starting the backend.
+* Fast2SMS notifications require a valid API key and sufficient account balance.
+* Flyway applies database migrations automatically when the backend starts.
+
+
+```
+
+## Developed By
+
+**Smriti Prajapati**
