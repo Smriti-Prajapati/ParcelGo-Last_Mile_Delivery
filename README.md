@@ -1,8 +1,8 @@
 # ParcelGo — Last-Mile Delivery Tracker
 
-ParcelGo is a delivery management platform for handling orders, delivery pricing, agent assignment, and order tracking.
+ParcelGo is a delivery management platform built to handle the complete last-mile delivery process — from placing an order and calculating its delivery charge to assigning an agent and tracking the delivery.
 
-## 🚀 Live Demo
+## Live Demo
 
 **Frontend:** [ParcelGo Live App](https://parcel-go-last-mile-delivery.vercel.app/)
 
@@ -10,15 +10,15 @@ ParcelGo is a delivery management platform for handling orders, delivery pricing
 
 ## Features
 
-* Customer registration and order placement
-* Automatic delivery charge calculation
-* B2B/B2C and prepaid/COD pricing
-* Pickup and drop zone detection
-* Manual and automatic delivery-agent assignment
-* Order tracking with complete status history
-* Failed-delivery rescheduling
-* Admin management of zones, rates, orders, and agents
-* Email and SMS notifications for delivery status changes
+* Customers can register, place orders, and track deliveries.
+* Delivery charges are calculated automatically before an order is confirmed.
+* Supports B2B/B2C and prepaid/COD orders.
+* Pickup and drop locations are mapped to configured zones.
+* Admins can assign agents manually or use automatic assignment.
+* Customers can view the complete tracking history of an order.
+* Failed deliveries can be rescheduled for another attempt.
+* Admins can manage zones, rates, orders, customers, and delivery agents.
+* Customers receive email and SMS notifications when the delivery status changes.
 
 ## Tech Stack
 
@@ -26,13 +26,15 @@ ParcelGo is a delivery management platform for handling orders, delivery pricing
 * **Backend:** Java 17, Spring Boot
 * **Database:** PostgreSQL
 * **ORM:** Spring Data JPA / Hibernate
-* **Security:** Spring Security, JWT
-* **Migrations:** Flyway
+* **Authentication:** Spring Security, JWT
+* **Database Migrations:** Flyway
 * **Notifications:** Spring Mail, Fast2SMS
 
 ## Setup
 
 ### Requirements
+
+Make sure you have:
 
 * Java 17+
 * Maven 3.8+
@@ -52,13 +54,11 @@ cd parcelgo
 CREATE DATABASE parcelgo;
 ```
 
-Flyway runs the required database migrations automatically when the backend starts.
+Flyway will create and update the required tables when the backend starts.
 
-### 3. Environment Variables
+### 3. Configure Environment Variables
 
-Create a `.env` file using `.env.example`.
-
-**`.env.example`**
+Create a `.env` file based on `.env.example`.
 
 ```env
 DATABASE_URL=your_database_url
@@ -73,24 +73,22 @@ MAIL_PASSWORD=your_email_password
 FAST2SMS_API_KEY=your_fast2sms_api_key
 ```
 
-Replace the placeholder values with your actual credentials in your local `.env` file.
+Use your actual credentials in the local `.env` file.
 
-**Never commit `.env` or real credentials to GitHub.**
+**Do not commit `.env` or any real credentials to GitHub.**
 
-### 4. Run the Backend
+### 4. Start the Backend
 
 ```bash
 cd backend
 mvn spring-boot:run
 ```
 
-Backend runs at:
+The backend will start at:
 
-```text
-http://localhost:8080
-```
+`http://localhost:8080`
 
-### 5. Run the Frontend
+### 5. Start the Frontend
 
 ```bash
 cd frontend
@@ -98,11 +96,9 @@ npm install
 npm run dev
 ```
 
-Frontend runs at:
+The frontend will start at:
 
-```text
-http://localhost:5173
-```
+`http://localhost:5173`
 
 ## API Documentation
 
@@ -154,9 +150,9 @@ PATCH /api/agents/{id}/availability
 
 ## Database Schema
 
-ParcelGo uses PostgreSQL with Flyway for database migrations.
+ParcelGo uses PostgreSQL, with Flyway handling database migrations.
 
-The main entities include:
+The database covers the main parts of the application:
 
 * Users and roles
 * Customers
@@ -168,7 +164,7 @@ The main entities include:
 * Tracking history
 * Delivery assignments
 
-Migration files are located at:
+Migration files can be found in:
 
 ```text
 backend/src/main/resources/db/migration/
@@ -176,57 +172,57 @@ backend/src/main/resources/db/migration/
 
 ## Rate Calculation
 
-The delivery charge is calculated before the customer confirms the order.
+The delivery charge is worked out when the customer enters the package details and is shown before the order is confirmed.
 
-### 1. Zone Detection
+### 1. Find the Zones
 
 The pickup and drop pincodes are matched with the zones configured by the admin.
 
-### 2. Volumetric Weight
+### 2. Calculate Volumetric Weight
 
 ```text
-Volumetric Weight = L × B × H / 5000
+Volumetric Weight = (L × B × H) / 5000
 ```
 
-### 3. Billable Weight
+### 3. Find the Billable Weight
 
-The higher value between actual weight and volumetric weight is used.
+The system uses whichever is higher:
 
 ```text
 Billable Weight = max(Actual Weight, Volumetric Weight)
 ```
 
-### 4. Apply Rate
+### 4. Select the Rate
 
-The applicable rate is selected based on:
+The rate card is selected based on:
 
 * B2B or B2C
 * Intra-zone or Inter-zone
 * Weight range
 
-### 5. COD Charge
+### 5. Add COD Charge
 
-For COD orders, the configured COD surcharge is added.
+For COD orders, the configured COD surcharge is added to the delivery charge.
 
 ```text
 Final Charge = Base Delivery Charge + COD Surcharge
 ```
 
-All rates are stored in the database and can be updated by the admin without changing the application code.
+Rates are stored in the database, so admins can update them without changing the application code.
 
 ## Notifications
 
 ### Email
 
-Email notifications are implemented using Spring Mail and are sent to customers when their order status changes.
+Email notifications are handled through Spring Mail. Customers receive an email when their order status changes.
 
 ### SMS
 
-SMS notifications are implemented using the Fast2SMS API.
+SMS notifications are integrated using the Fast2SMS API.
 
-The SMS integration is ready but requires an active Fast2SMS account with sufficient balance and a configured `FAST2SMS_API_KEY`.
+The integration is already implemented. To enable SMS sending, configure `FAST2SMS_API_KEY` and maintain sufficient balance in the Fast2SMS account.
 
-Email works independently, so customers can still receive email notifications even when SMS is not activated.
+Email notifications work independently of SMS.
 
 ## Testing
 
@@ -237,7 +233,7 @@ cd backend
 mvn test
 ```
 
-Tests cover key functionality including:
+The tests cover the main delivery and pricing logic, including:
 
 * Rate calculation
 * Volumetric weight
