@@ -303,36 +303,3 @@ The tests cover key areas such as:
 * COD charges
 * Agent assignment
 * Order workflow
-
-## Project Structure
-
-```text
-ParcelGo-Last_Mile_Delivery/
-├── backend/
-│   └── src/
-│       └── main/
-│           ├── java/
-│           └── resources/
-│               └── db/
-│                   └── migration/
-├── frontend/
-│   ├── src/
-│   └── public/
-├── .env.example
-└── README.md
-```
-
-## Notes
-
-* Configure all database and external-service credentials through environment variables.
-* Do not commit `.env` or API keys to the repository.
-* Make sure PostgreSQL is running before starting the backend.
-* Fast2SMS notifications require a valid API key and sufficient account balance.
-* Flyway applies database migrations automatically when the backend starts.
-
-
-```
-
-## Developed By
-
-**Smriti Prajapati**
