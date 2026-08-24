@@ -2,17 +2,23 @@
 
 ParcelGo is a delivery management platform for handling orders, delivery pricing, agent assignment, and order tracking.
 
+## 🚀 Live Demo
+
+**Frontend:** [ParcelGo Live App](https://parcel-go-last-mile-delivery.vercel.app/)
+
+**Backend:** [ParcelGo API](https://parcelgo-backend-8z59.onrender.com/)
+
 ## Features
 
 * Customer registration and order placement
 * Automatic delivery charge calculation
 * B2B/B2C and prepaid/COD pricing
 * Pickup and drop zone detection
-* Manual and automatic agent assignment
-* Order tracking and status history
+* Manual and automatic delivery-agent assignment
+* Order tracking with complete status history
 * Failed-delivery rescheduling
 * Admin management of zones, rates, orders, and agents
-* Email notifications for status changes
+* Email and SMS notifications for delivery status changes
 
 ## Tech Stack
 
@@ -22,7 +28,7 @@ ParcelGo is a delivery management platform for handling orders, delivery pricing
 * **ORM:** Spring Data JPA / Hibernate
 * **Security:** Spring Security, JWT
 * **Migrations:** Flyway
-* **Email:** Spring Mail
+* **Notifications:** Spring Mail, Fast2SMS
 
 ## Setup
 
@@ -33,15 +39,22 @@ ParcelGo is a delivery management platform for handling orders, delivery pricing
 * Node.js 18+
 * PostgreSQL 14+
 
-### Database
+### 1. Clone the Repository
+
+```bash
+git clone https://github.com/your-username/parcelgo.git
+cd parcelgo
+```
+
+### 2. Create the Database
 
 ```sql
 CREATE DATABASE parcelgo;
 ```
 
-Flyway runs the database migrations automatically when the backend starts.
+Flyway runs the required database migrations automatically when the backend starts.
 
-### Environment Variables
+### 3. Environment Variables
 
 Create a `.env` file using `.env.example`.
 
@@ -51,26 +64,44 @@ Create a `.env` file using `.env.example`.
 DATABASE_URL=your_database_url
 DATABASE_USERNAME=your_database_username
 DATABASE_PASSWORD=your_database_password
+
 JWT_SECRET=your_jwt_secret
+
 MAIL_USERNAME=your_email
 MAIL_PASSWORD=your_email_password
+
+FAST2SMS_API_KEY=your_fast2sms_api_key
 ```
 
-Do not commit your actual `.env` file or credentials to the repository.
+Replace the placeholder values with your actual credentials in your local `.env` file.
 
-### Run Backend
+**Never commit `.env` or real credentials to GitHub.**
+
+### 4. Run the Backend
 
 ```bash
 cd backend
 mvn spring-boot:run
 ```
 
-### Run Frontend
+Backend runs at:
+
+```text
+http://localhost:8080
+```
+
+### 5. Run the Frontend
 
 ```bash
 cd frontend
 npm install
 npm run dev
+```
+
+Frontend runs at:
+
+```text
+http://localhost:5173
 ```
 
 ## API Documentation
@@ -123,7 +154,7 @@ PATCH /api/agents/{id}/availability
 
 ## Database Schema
 
-The application uses PostgreSQL with Flyway migrations.
+ParcelGo uses PostgreSQL with Flyway for database migrations.
 
 The main entities include:
 
@@ -147,17 +178,19 @@ backend/src/main/resources/db/migration/
 
 The delivery charge is calculated before the customer confirms the order.
 
-### 1. Detect Zones
+### 1. Zone Detection
 
-Pickup and drop pincodes are matched with the zones configured by the admin.
+The pickup and drop pincodes are matched with the zones configured by the admin.
 
-### 2. Calculate Volumetric Weight
+### 2. Volumetric Weight
 
 ```text
 Volumetric Weight = L × B × H / 5000
 ```
 
-### 3. Calculate Billable Weight
+### 3. Billable Weight
+
+The higher value between actual weight and volumetric weight is used.
 
 ```text
 Billable Weight = max(Actual Weight, Volumetric Weight)
@@ -171,7 +204,7 @@ The applicable rate is selected based on:
 * Intra-zone or Inter-zone
 * Weight range
 
-### 5. Add COD Charge
+### 5. COD Charge
 
 For COD orders, the configured COD surcharge is added.
 
@@ -181,8 +214,34 @@ Final Charge = Base Delivery Charge + COD Surcharge
 
 All rates are stored in the database and can be updated by the admin without changing the application code.
 
-## Live Demo
+## Notifications
 
-**Frontend:** [ParcelGo Live App](https://parcel-go-last-mile-delivery.vercel.app/?utm_source=chatgpt.com)
+### Email
 
-**Backend:** [ParcelGo API](https://parcelgo-backend-8z59.onrender.com?utm_source=chatgpt.com)
+Email notifications are implemented using Spring Mail and are sent to customers when their order status changes.
+
+### SMS
+
+SMS notifications are implemented using the Fast2SMS API.
+
+The SMS integration is ready but requires an active Fast2SMS account with sufficient balance and a configured `FAST2SMS_API_KEY`.
+
+Email works independently, so customers can still receive email notifications even when SMS is not activated.
+
+## Testing
+
+Run the backend tests with:
+
+```bash
+cd backend
+mvn test
+```
+
+Tests cover key functionality including:
+
+* Rate calculation
+* Volumetric weight
+* B2B/B2C pricing
+* Intra/inter-zone pricing
+* COD charges
+* Agent assignment
