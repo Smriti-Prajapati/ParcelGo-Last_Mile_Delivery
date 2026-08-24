@@ -181,14 +181,6 @@ The main entities are:
 * Tracking history
 * Reschedules
 
-Migration files are located at:
-
-```text
-backend/src/main/resources/db/migration/
-```
-
-The `orders` table stores the current order status, while `order_tracking` stores every status change along with its timestamp and actor.
-
 Tracking history is preserved rather than overwritten, so the complete delivery journey remains available for reference.
 
 ## Rate Calculation
