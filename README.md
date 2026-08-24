@@ -1,184 +1,71 @@
 # ParcelGo — Last-Mile Delivery Tracker
 
-ParcelGo is a delivery management platform built to simplify the last-mile delivery process. It allows customers to place and track orders, helps admins manage pricing and delivery operations, and gives delivery agents the tools they need to manage assigned deliveries.
+ParcelGo is a delivery management platform for handling orders, delivery pricing, agent assignment, and order tracking.
 
-## What ParcelGo Does
+## Features
 
-* Customers can register, place orders, view the delivery charge before confirming, and track their orders.
-* Admins can manage zones, pricing, COD charges, customers, orders, and delivery agents.
-* Delivery agents can view their assigned orders and update delivery status.
-* Delivery charges are calculated automatically based on package weight, dimensions, zones, order type, and payment method.
-* Orders can be manually assigned by an admin or automatically assigned to a nearby available agent.
-* Failed deliveries can be rescheduled by the customer.
-* Every order status change is saved in the tracking history.
-* Customers receive notifications when their delivery status changes.
-
-## How Delivery Charges Are Calculated
-
-The charge is calculated automatically when the customer enters the package details.
-
-**1. Find the zones**
-
-The pickup and drop pincodes are matched with the zones configured by the admin.
-
-**2. Calculate volumetric weight**
-
-```text
-Volumetric Weight = L × B × H / 5000
-```
-
-**3. Find billable weight**
-
-The higher value between actual weight and volumetric weight is used.
-
-```text
-Billable Weight = max(Actual Weight, Volumetric Weight)
-```
-
-**4. Find the applicable rate**
-
-The system checks the configured rate card based on:
-
-* B2B or B2C
-* Intra-zone or Inter-zone
-* Weight range
-
-**5. Add COD charge**
-
-For COD orders, the applicable COD surcharge is added.
-
-The final amount is shown to the customer **before the order is confirmed**.
-
-All rates are stored in the database, so admins can update them without changing the code.
-
-## Delivery Flow
-
-```text
-Order Created
-     ↓
-Picked Up
-     ↓
-In Transit
-     ↓
-Out for Delivery
-     ↓
-Delivered
-```
-
-If a delivery fails:
-
-```text
-Out for Delivery
-     ↓
-Failed
-     ↓
-Customer Reschedules
-     ↓
-Agent Reassigned
-     ↓
-New Delivery Attempt
-```
-
-Every status change is recorded with the time and the person/system that made the change, so the tracking history is not overwritten.
-
-## Agent Assignment
-
-ParcelGo supports both manual and automatic assignment.
-
-**Manual assignment:**
-An admin can select an available delivery agent for an order.
-
-**Automatic assignment:**
-The system looks for available agents and selects a suitable nearby agent based on their location or zone.
+* Customer registration and order placement
+* Automatic delivery charge calculation
+* B2B/B2C and prepaid/COD pricing
+* Pickup and drop zone detection
+* Manual and automatic agent assignment
+* Order tracking and status history
+* Failed-delivery rescheduling
+* Admin management of zones, rates, orders, and agents
+* Email notifications for status changes
 
 ## Tech Stack
 
 * **Frontend:** React, TypeScript, Vite, Tailwind CSS
 * **Backend:** Java 17, Spring Boot
-* **Security:** Spring Security, JWT
 * **Database:** PostgreSQL
 * **ORM:** Spring Data JPA / Hibernate
+* **Security:** Spring Security, JWT
 * **Migrations:** Flyway
 * **Email:** Spring Mail
 
-## Project Structure
-
-```text
-ParcelGo/
-├── backend/
-│   └── src/
-│       └── main/
-│           ├── java/com/parcelgo/
-│           │   ├── config/
-│           │   ├── controller/
-│           │   ├── dto/
-│           │   ├── exception/
-│           │   ├── model/
-│           │   ├── repository/
-│           │   ├── security/
-│           │   └── service/
-│           └── resources/
-│               └── db/migration/
-│
-└── frontend/
-    └── src/
-        ├── components/
-        ├── hooks/
-        ├── lib/
-        ├── pages/
-        └── types/
-```
-
-## Getting Started
+## Setup
 
 ### Requirements
-
-Make sure you have the following installed:
 
 * Java 17+
 * Maven 3.8+
 * Node.js 18+
 * PostgreSQL 14+
 
-### 1. Clone the project
-
-```bash
-git clone https://github.com/your-username/parcelgo.git
-cd parcelgo
-```
-
-### 2. Create the database
+### Database
 
 ```sql
 CREATE DATABASE parcelgo;
 ```
 
-Flyway will create and update the required tables when the backend starts.
+Flyway runs the database migrations automatically when the backend starts.
 
-### 3. Configure environment variables
+### Environment Variables
 
-Create your `.env` file using the example provided:
+Create a `.env` file using `.env.example`.
 
-```bash
-cp .env.example .env
+**`.env.example`**
+
+```env
+DATABASE_URL=your_database_url
+DATABASE_USERNAME=your_database_username
+DATABASE_PASSWORD=your_database_password
+JWT_SECRET=your_jwt_secret
+MAIL_USERNAME=your_email
+MAIL_PASSWORD=your_email_password
 ```
 
-Add your database, JWT, and email configuration.
+Do not commit your actual `.env` file or credentials to the repository.
 
-### 4. Start the backend
+### Run Backend
 
 ```bash
 cd backend
 mvn spring-boot:run
 ```
 
-The backend will run at:
-
-```text
-http://localhost:8080
-```
-
-### 5. Start the frontend
+### Run Frontend
 
 ```bash
 cd frontend
@@ -186,30 +73,7 @@ npm install
 npm run dev
 ```
 
-The frontend will run at:
-
-```text
-http://localhost:5173
-```
-
-## Environment Variables
-
-The complete list of variables is available in `.env.example`.
-
-The main configuration includes:
-
-```text
-DATABASE_URL
-DATABASE_USERNAME
-DATABASE_PASSWORD
-JWT_SECRET
-MAIL_USERNAME
-MAIL_PASSWORD
-```
-
-Email configuration is optional. If email credentials are not provided, the application can still run without sending emails.
-
-## API Overview
+## API Documentation
 
 ### Authentication
 
@@ -257,54 +121,68 @@ PUT   /api/agents/{id}
 PATCH /api/agents/{id}/availability
 ```
 
-### Admin
+## Database Schema
+
+The application uses PostgreSQL with Flyway migrations.
+
+The main entities include:
+
+* Users and roles
+* Customers
+* Delivery agents
+* Orders
+* Zones
+* Rate cards
+* COD charges
+* Tracking history
+* Delivery assignments
+
+Migration files are located at:
 
 ```text
-GET /api/admin/dashboard
-GET /api/admin/customers
+backend/src/main/resources/db/migration/
 ```
 
-## Testing
+## Rate Calculation
 
-Run the backend tests with:
+The delivery charge is calculated before the customer confirms the order.
 
-```bash
-cd backend
-mvn test
+### 1. Detect Zones
+
+Pickup and drop pincodes are matched with the zones configured by the admin.
+
+### 2. Calculate Volumetric Weight
+
+```text
+Volumetric Weight = L × B × H / 5000
 ```
 
-The tests cover important parts of the application such as:
+### 3. Calculate Billable Weight
 
-* Rate calculation
-* Volumetric weight
-* B2B/B2C pricing
-* Intra/inter-zone pricing
-* COD charges
-* Agent assignment
+```text
+Billable Weight = max(Actual Weight, Volumetric Weight)
+```
 
-## Demo Accounts
+### 4. Apply Rate
 
-| Role     | Email                                               | Password |
-| -------- | --------------------------------------------------- | -------- |
-| Admin    | [admin@parcelgo.in](mailto:admin@parcelgo.in)       | password |
-| Agent    | [agent@parcelgo.in](mailto:agent@parcelgo.in)       | password |
-| Customer | [customer@example.com](mailto:customer@example.com) | password |
+The applicable rate is selected based on:
 
-## System Design
+* B2B or B2C
+* Intra-zone or Inter-zone
+* Weight range
 
-The detailed system design is available in [`SYSTEM_DESIGN.md`](./SYSTEM_DESIGN.md).
+### 5. Add COD Charge
 
-It explains the main design decisions behind:
+For COD orders, the configured COD surcharge is added.
 
-* Rate calculation
-* Zone detection
-* Agent assignment
-* Order status tracking
-* Failed delivery and rescheduling
+```text
+Final Charge = Base Delivery Charge + COD Surcharge
+```
+
+All rates are stored in the database and can be updated by the admin without changing the application code.
 
 ## Live Demo
 
-**Frontend:** Add deployed URL here
+**Frontend:** [ParcelGo Live App](https://parcel-go-last-mile-delivery.vercel.app/?utm_source=chatgpt.com)
 
-**Backend:** Add deployed API URL here
-
+**Backend:** [ParcelGo API](https://parcelgo-backend-8z59.onrender.com?utm_source=chatgpt.com)
