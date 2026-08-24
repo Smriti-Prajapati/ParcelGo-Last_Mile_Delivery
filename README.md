@@ -79,12 +79,6 @@ MAIL_PASSWORD=your_app_password
 FAST2SMS_API_KEY=your_fast2sms_api_key
 ```
 
-Use your actual credentials only in your local environment.
-
-**Never commit `.env` or real credentials to GitHub.**
-
-The repository includes `.env.example` with placeholder values.
-
 ### 4. Run the Backend
 
 ```bash
