@@ -40,6 +40,7 @@ public class SecurityConfig {
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers("/api/auth/**").permitAll()
+                .requestMatchers("/health").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/orders/track/**").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/orders/*/tracking").permitAll()
                 .requestMatchers("/api/admin/**").hasRole("ADMIN")
