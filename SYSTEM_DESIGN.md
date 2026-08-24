@@ -1,65 +1,96 @@
 # ParcelGo — System Design
 
+ParcelGo is designed around four main parts of the delivery process: pricing, zone detection, agent assignment, and order tracking. The system uses a Spring Boot backend with PostgreSQL, while the frontend communicates with the backend through REST APIs.
+
+![ParcelGo System Architecture](./docs/parcelgo-system-architecture.jpeg)
+
 ## Rate Calculation Engine
 
-The rate engine is the core of the platform and is fully database-driven with no hardcoded values.
+The rate calculation is database-driven, so pricing can be changed by an admin without modifying the application code.
 
-**Flow:**
+The calculation works as follows:
 
-1. The customer provides pickup pincode, drop pincode, package dimensions, actual weight, order type (B2B/B2C), and payment type.
-2. The system looks up each pincode in the `zone_areas` table to resolve the pickup zone and drop zone. If a pincode isn't mapped, the order is rejected with a clear error — no silent failures.
-3. Volumetric weight is computed as `L × B × H ÷ 5000`. This is the courier industry standard divisor for converting dimensional weight to kg.
-4. Billable weight = `max(actual_weight, volumetric_weight)`. The customer is billed on whichever is higher.
-5. Zone type is INTRA if pickup and drop zones share the same zone ID, INTER otherwise.
-6. The system queries `rate_cards` for the matching combination of `order_type`, `zone_type`, and a weight range that contains the billable weight. The query uses `min_weight <= billable_weight < max_weight` to find the right slab.
-7. Base charge = `base_charge + (rate_per_kg × billable_weight)`.
-8. If payment type is COD, the system queries `cod_surcharges` for the matching order type and adds the configured amount.
-9. The full breakdown is returned to the customer before confirmation — actual weight, volumetric weight, billable weight, zone names, zone type, base charge, COD surcharge, and total.
+1. The customer enters the pickup and drop pincodes, package dimensions, actual weight, order type (B2B/B2C), and payment type.
+2. The system looks up both pincodes in `zone_areas` to find their respective zones. If a pincode is not configured, the order cannot proceed.
+3. Volumetric weight is calculated using:
 
-Changing a rate in the admin panel takes effect immediately for all future orders. There is no caching or code change required.
+**Volumetric Weight = (L × B × H) / 5000**
+
+4. The higher of actual and volumetric weight becomes the billable weight.
+
+```text
+Billable Weight = max(Actual Weight, Volumetric Weight)
+
+```
+
+5. The system determines whether the shipment is **INTRA** or **INTER** zone.
+6. It then finds the matching rate card using the order type, zone type, and weight range.
+7. The base delivery charge is calculated from the configured base charge and per-kg rate.
+8. For COD orders, the applicable COD surcharge is added.
+9. The complete calculation is returned before the customer confirms the order.
+
+This keeps pricing flexible because admins can update rate cards directly from the application.
 
 ## Zone Detection
 
-Zones are geographic groupings. Each zone has one or more area/pincode mappings stored in `zone_areas`. Zone detection is a simple lookup: given a pincode, find the matching row and return its parent zone.
+ParcelGo uses pincode-based zone detection. Each zone can contain multiple pincodes stored in the `zone_areas` table.
 
-This approach is practical and explainable. The admin can add new pincodes to zones at any time through the UI without touching code or redeploying. For a production system, this could be extended to support city names, lat/lon bounding boxes, or integration with a geocoding API — but for the assessment scope, pincode-based lookup is accurate, testable, and fast.
+When an order is created, the pickup and drop pincodes are looked up to determine their zones. The two zones are then used to decide whether the shipment is intra-zone or inter-zone.
 
-If a pincode is not found, the system returns a specific error telling the customer to contact support, rather than assigning a default zone silently.
+This approach is simple, fast, and easy to maintain for the current scope. New pincodes can be added by the admin without changing the code.
 
-## Auto-Assignment Logic
+## Auto-Assignment
 
-When an order needs an agent (either triggered manually by admin or automatically), the assignment service runs:
+When an order needs a delivery agent, the assignment service first looks for agents who are currently available and belong to the order's delivery zone.
 
-1. Look for available agents (availability = AVAILABLE) whose home zone matches the order's drop zone. Agents assigned to the delivery zone are the best fit since they're already in the area.
-2. If no agents are available in the drop zone, fall back to any available agent across all zones.
-3. Among the candidates, the current implementation selects by lowest ID as a deterministic tiebreaker. When agents have GPS coordinates stored, the haversine distance formula is used to pick the geographically closest agent.
-4. The selected agent is assigned to the order and their availability is set to BUSY.
+If no suitable agent is available in that zone, the system falls back to other available agents.
 
-This is intentionally straightforward. The assignment result is deterministic and auditable — you can always explain why a particular agent was chosen. A more complex routing engine (round-robin, load balancing, ETA prediction) could be layered on top of this interface without changing the order or agent models.
+When location data is available, the system can use the agent's current location to select the nearest suitable agent. The selected agent is then assigned to the order and marked as `BUSY`.
 
-## Order Status Lifecycle
+The assignment logic is kept separate from the order service so it can be extended later with features such as load balancing, ETA, or more advanced location-based matching.
 
-Status transitions are strictly enforced:
+## Order Status & Tracking
+
+ParcelGo follows a controlled order lifecycle:
+
+```text
+CONFIRMED
+    ↓
+PICKED_UP
+    ↓
+IN_TRANSIT
+    ↓
+OUT_FOR_DELIVERY
+    ↓
+DELIVERED
 
 ```
-CONFIRMED → PICKED_UP → IN_TRANSIT → OUT_FOR_DELIVERY → DELIVERED
-                                                       ↘ FAILED → CONFIRMED (reschedule)
+
+If delivery fails:
+
+```text
+OUT_FOR_DELIVERY
+    ↓
+FAILED
+    ↓
+RESCHEDULE
+    ↓
+CONFIRMED
+
 ```
 
-Each transition is validated against a predefined map. Jumping from CONFIRMED to DELIVERED directly, for example, is rejected. This prevents data integrity issues where tracking history would be misleading.
+Status changes are validated before being saved, preventing invalid transitions such as directly moving an order from `CONFIRMED` to `DELIVERED`.
 
-Every status change writes an immutable record to `order_tracking` with the new status, the actor's ID and name, optional notes, and a server-side timestamp. The current status is stored on the `orders` table for fast query access, but the source of truth for the full history is always `order_tracking`. Records in this table are never updated or deleted.
+Every status change is stored in the `order_tracking` table with the status, actor, notes, and timestamp. The current status is also stored in the `orders` table for quick access, while `order_tracking` keeps the complete history.
+
+Tracking records are not overwritten, so the full delivery journey remains available.
 
 ## Failed Delivery Handling
 
-When an agent marks an order as FAILED:
+When an agent marks an order as `FAILED`, the customer is notified by email and can choose a new delivery date.
 
-1. Order status is set to FAILED and a tracking event is recorded.
-2. The customer receives an email notification explaining the failure.
-3. The customer opens the order detail page and picks a new delivery date using a date picker (future dates only).
-4. A row is inserted into `reschedules` capturing the original date, the new date, and an optional reason. This history is preserved even after the order is re-confirmed.
-5. The previous agent is released (availability reset to AVAILABLE) and the order is set back to CONFIRMED with the new scheduled date.
-6. The system immediately attempts auto-assignment for the rescheduled order. If no agent is available at that moment, the order stays unassigned and the admin can assign one later.
-7. The tracking timeline shows the full history including the failed attempt — nothing is erased.
+The reschedule is stored with the original date, new date, and optional reason. The previous agent is released and the order is moved back to `CONFIRMED`.
 
-This design ensures the failed delivery is fully auditable, the customer has a clear path to reschedule, and the agent pool is kept accurate.
+The system then tries to assign an available agent again. If none is available, the order remains unassigned so an admin can assign one later.
+
+The failed attempt is never removed from the tracking history, keeping the entire delivery process auditable. 
