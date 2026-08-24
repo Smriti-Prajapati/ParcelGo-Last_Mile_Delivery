@@ -1,4 +1,4 @@
-# ParcelGo — Last-Mile Delivery Tracker
+# ParcelGo — Last Mile Delivery Tracker
 
 ParcelGo is a last-mile delivery management platform that handles the main steps of a delivery workflow — creating orders, calculating delivery charges, assigning agents, tracking orders, and notifying customers.
 
