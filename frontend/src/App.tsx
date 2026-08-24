@@ -66,7 +66,7 @@ export default function App() {
           <Route path="orders/:id" element={<OrderDetail />} />
           <Route path="zones" element={<AdminZones />} />
           <Route path="rates" element={<AdminRates />} />
-          <Route path="agcents" element={<AdminAgents />} />
+          <Route path="agents" element={<AdminAgents />} />
           <Route path="customers" element={<AdminCustomers />} />
         </Route>
 
